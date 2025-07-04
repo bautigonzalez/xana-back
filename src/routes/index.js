@@ -1,12 +1,18 @@
-const express = require('express');
+import express from 'express';
+import chatRoutes from './chatRoutes.js';
+
 const router = express.Router();
 
-// Ruta principal de la API
 router.get('/', (req, res) => {
   res.json({
     message: 'Xana API is running! 🚀',
     version: '1.0.0',
     endpoints: {
+      chat: {
+        analyze: 'POST /chat/analyze',
+        test: 'GET /chat/test',
+        info: 'GET /chat/info'
+      },
       pharmacies: '/pharmacies',
       centers: '/centers',
       health: '/health'
@@ -15,7 +21,8 @@ router.get('/', (req, res) => {
   });
 });
 
-// Endpoint de farmacias (placeholder)
+router.use('/chat', chatRoutes);
+
 router.get('/pharmacies', (req, res) => {
   res.json({
     message: 'Farmacias endpoint - Coming soon!',
@@ -23,7 +30,6 @@ router.get('/pharmacies', (req, res) => {
   });
 });
 
-// Endpoint de centros médicos (placeholder)
 router.get('/centers', (req, res) => {
   res.json({
     message: 'Centros médicos endpoint - Coming soon!',
@@ -31,7 +37,6 @@ router.get('/centers', (req, res) => {
   });
 });
 
-// Endpoint de salud de la API
 router.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
@@ -40,4 +45,4 @@ router.get('/health', (req, res) => {
   });
 });
 
-module.exports = router; 
+export default router; 
