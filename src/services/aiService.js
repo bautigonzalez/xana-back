@@ -351,6 +351,87 @@ ${JSON.stringify(names, null, 2)}
     const data = await response.json();
     return data;
   }
+
+  /**
+   * Recomienda hasta 3 centros médicos abiertos según el historial de chat y el listado de lugares, delegando la selección a la IA.
+   */
+  async recommendMedicalCenters(places, conversationHistory = []) {
+    // Filtrar solo lugares abiertos
+    const abiertos = (places || []).filter(p => p.open || (p.opening_hours && p.opening_hours.open_now));
+    if (abiertos.length === 0) {
+      return { recommended: [], message: 'No hay centros abiertos en la zona.' };
+    }
+    // Prompt detallado y específico
+    const prompt = `Eres un asistente médico virtual.
+1. Analiza el siguiente historial de chat entre un usuario y un asistente, identificando síntomas, contexto y nivel de urgencia.
+2. Revisa el listado de centros médicos cercanos, cada uno con: id, nombre, especialidades, si está abierto, distancia, tipo y rating.
+3. Elige hasta 3 lugares del listado que sean los más adecuados para la situación del usuario, priorizando:
+- Centros abiertos.
+- Centros con especialidades relevantes para los síntomas detectados.
+- Centros de mayor complejidad si la urgencia es alta.
+- Centros más cercanos y con mejor rating.
+- Analiza también el NOMBRE de cada centro. Si el nombre indica una especialidad que no es relevante para la emergencia (por ejemplo, “cardiovascular” para un trauma craneal, “oftalmológico” para un infarto, “pediatría” para un adulto, etc.), descártalo salvo que no haya otras opciones.
+- Prioriza hospitales generales, de alta complejidad o con servicios de urgencias generales cuando la situación lo requiera.
+- Si solo hay centros de especialidad no relevante, adviértelo en el mensaje.
+4. Si no hay lugares apropiados abiertos, explica el motivo y sugiere cambiar de ubicación o llamar a emergencias si es necesario.
+5. Devuelve solo el siguiente JSON (sin texto adicional):
+{"recommendedPlaceIds": ["id1", "id2", "id3"], "message": "Texto de advertencia o recomendación para el usuario"}`;
+    // Convertir historial y lugares a texto plano
+    const chatText = (conversationHistory || []).map(
+      m => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content}`
+    ).join('\n');
+    const placesText = abiertos.map(
+      p => `ID: ${p.id}, Nombre: ${p.name}, Especialidades: ${(p.specialties || []).join(', ')}, Distancia: ${p.distance || p.distance_meters || ''}, Tipo: ${p.type || (p.types ? p.types[0] : '')}, Rating: ${p.rating || ''}`
+    ).join('\n');
+    const fullPrompt = `${prompt}\n\nHistorial de chat:\n${chatText}\n\nLugares abiertos:\n${placesText}`;
+    let iaResult = { recommendedPlaceIds: [], message: '' };
+    let iaRawResponse = null;
+    try {
+      // Usar callGemini para enviar el prompt plano
+      const geminiResponse = await this.callGemini(fullPrompt);
+      // Extraer texto de la respuesta Gemini
+      let responseText = geminiResponse;
+      if (typeof geminiResponse === 'object' && geminiResponse.candidates) {
+        responseText = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      }
+      iaRawResponse = responseText;
+      if (typeof iaRawResponse === 'string') {
+        try {
+          iaResult = JSON.parse(iaRawResponse);
+        } catch (e) {
+          const match = iaRawResponse.match(/\{[\s\S]*\}/);
+          if (match) {
+            iaResult = JSON.parse(match[0]);
+          } else {
+            iaResult = { recommendedPlaceIds: [], message: 'No se pudo interpretar la respuesta de la IA.' };
+          }
+        }
+      } else {
+        iaResult = iaRawResponse;
+      }
+    } catch (e) {
+      iaResult = { recommendedPlaceIds: [], message: 'No se pudo obtener una recomendación inteligente. Intenta nuevamente.' };
+    }
+    // Filtrar los lugares abiertos usando los IDs recomendados por la IA
+    let recommended = [];
+    if (Array.isArray(iaResult.recommendedPlaceIds) && iaResult.recommendedPlaceIds.length > 0) {
+      recommended = abiertos.filter(p => iaResult.recommendedPlaceIds.includes(p.id));
+    }
+    // Fallback: si la IA falla, mostrar los 3 lugares abiertos más cercanos
+    if (recommended.length === 0) {
+      recommended = abiertos.sort((a, b) => {
+        if (a.distance_meters !== undefined && b.distance_meters !== undefined) {
+          if (a.distance_meters !== b.distance_meters) return a.distance_meters - b.distance_meters;
+        }
+        return (b.rating || 0) - (a.rating || 0);
+      }).slice(0, 3);
+      iaResult.message = iaResult.message || 'No se pudo obtener una recomendación inteligente, pero estos centros abiertos están disponibles cerca tuyo.';
+    }
+    return {
+      recommended,
+      message: iaResult.message || ''
+    };
+  }
 }
 
 export default new AIService(); 

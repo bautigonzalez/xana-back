@@ -91,6 +91,27 @@ class ChatController {
       });
     }
   }
+
+  async recommendMedicalCenters(req, res) {
+    try {
+      const { places, conversationHistory } = req.body;
+      if (!Array.isArray(places) || places.length === 0) {
+        return res.status(400).json({
+          error: 'Lista de lugares requerida',
+          message: 'Debes enviar un array de lugares cercanos para recomendar'
+        });
+      }
+      // Lógica principal delegada al servicio
+      const result = await aiService.recommendMedicalCenters(places, conversationHistory || []);
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error('❌ Error recomendando centros médicos:', error);
+      res.status(500).json({
+        error: 'Error interno del servidor',
+        message: error.message || 'Error procesando la solicitud'
+      });
+    }
+  }
 }
 
 export default new ChatController(); 
