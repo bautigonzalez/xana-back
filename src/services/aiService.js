@@ -240,6 +240,117 @@ Responde únicamente con el JSON.`;
       return false;
     }
   }
+
+  // Filtrar lugares usando IA (Gemini)
+  async filterValidMedicalCentersWithAI(places) {
+    try {
+      const limitedPlaces = places.slice(0, 20);
+      const names = limitedPlaces.map(place => ({ id: place.place_id || place.id, name: place.name }));
+      const prompt = `Analiza esta lista de lugares y responde SOLO con un array JSON de los IDs de los que sean EXCLUSIVAMENTE centros médicos, hospitales, clínicas, consultorios o farmacias reales.
+
+REGLAS ESTRICTAS:
+- INCLUIR solo: hospitales, clínicas, centros médicos, consultorios médicos, farmacias, laboratorios médicos
+- EXCLUIR: talleres, gomerías, comercios, bancos, escuelas, iglesias, oficinas, estaciones de servicio, cualquier lugar no médico
+- Si el nombre contiene palabras como "taller", "moto", "auto", "gomería", "comercio", "banco", "escuela", "iglesia", etc., NO incluirlo
+- Si tienes dudas sobre si es médico o no, NO incluirlo
+
+IMPORTANTE: Responde SOLO con el array JSON, sin ningún texto adicional ni bloques de código.
+
+Lista de lugares:
+${JSON.stringify(names, null, 2)}
+`;
+      const aiResponse = await this.callGemini(prompt);
+      let responseText = aiResponse;
+      if (typeof aiResponse === 'object' && aiResponse.candidates) {
+        responseText = aiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      }
+      let validIds = [];
+      try {
+        let cleanText = responseText;
+        cleanText = cleanText.replace(/^```json\s*/i, '');
+        cleanText = cleanText.replace(/\s*```$/i, '');
+        cleanText = cleanText.replace(/^```\s*/i, '');
+        const arrayMatch = cleanText.match(/\[[\s\S]*\]/);
+        let jsonString = null;
+        if (arrayMatch) {
+          jsonString = arrayMatch[0];
+          // Si el array no termina en ] intentar cerrarlo
+          if (!jsonString.trim().endsWith(']')) {
+            const lastQuote = jsonString.lastIndexOf('"');
+            if (lastQuote !== -1) {
+              jsonString = jsonString.slice(0, lastQuote + 1) + ']';
+            } else {
+              jsonString += ']';
+            }
+          }
+        } else {
+          // Si no hay array, intentar parsear todo
+          jsonString = cleanText;
+        }
+        try {
+          validIds = JSON.parse(jsonString);
+        } catch (innerError) {
+          // Si falla, intentar extraer IDs con regex
+          const idRegex = /"([^"]+)"/g;
+          let match;
+          validIds = [];
+          while ((match = idRegex.exec(jsonString)) !== null) {
+            validIds.push(match[1]);
+          }
+        }
+      } catch (parseError) {
+        console.error('Error parseando respuesta de Gemini:', parseError);
+        // fallback: devolver todos los lugares
+        return places;
+      }
+      if (!Array.isArray(validIds) || validIds.length === 0) {
+        return places;
+      }
+      const filteredPlaces = limitedPlaces.filter(place => validIds.includes(place.place_id || place.id));
+      // Filtro adicional de respaldo para excluir lugares no médicos
+      const nonMedicalKeywords = [
+        'taller', 'moto', 'auto', 'vehículo', 'vehiculo', 'gomería', 'gomeria', 'lubricentro', 'garage',
+        'comercio', 'banco', 'escuela', 'colegio', 'universidad', 'iglesia', 'templo', 'oficina',
+        'estación', 'estacion', 'servicio técnico', 'servicio tecnico', 'electrónica', 'electronica',
+        'computadora', 'pc', 'informática', 'informatica', 'repuesto', 'accesorio', 'accesorios'
+      ];
+      const finalFilteredPlaces = filteredPlaces.filter(place => {
+        const nameLower = place.name.toLowerCase();
+        return !nonMedicalKeywords.some(keyword => nameLower.includes(keyword));
+      });
+      if (finalFilteredPlaces.length < Math.max(1, limitedPlaces.length * 0.1)) {
+        return limitedPlaces;
+      }
+      return finalFilteredPlaces;
+    } catch (error) {
+      console.error('Error filtrando lugares con Gemini:', error);
+      return places;
+    }
+  }
+
+  // Llamada genérica a Gemini (para prompts custom)
+  async callGemini(prompt) {
+    if (!this.geminiApiKey) throw new Error('No hay API key de Gemini configurada');
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiApiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 500,
+          topP: 0.8,
+          topK: 40
+        }
+      })
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    }
+    const data = await response.json();
+    return data;
+  }
 }
 
 export default new AIService(); 

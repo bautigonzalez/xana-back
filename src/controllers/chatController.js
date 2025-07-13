@@ -71,6 +71,26 @@ class ChatController {
       });
     }
   }
+
+  async filterMedicalCenters(req, res) {
+    try {
+      const { places } = req.body;
+      if (!Array.isArray(places) || places.length === 0) {
+        return res.status(400).json({
+          error: 'Lista de lugares requerida',
+          message: 'Debes enviar un array de lugares a filtrar'
+        });
+      }
+      const filtered = await aiService.filterValidMedicalCentersWithAI(places);
+      res.json({ success: true, data: filtered });
+    } catch (error) {
+      console.error('❌ Error filtrando centros médicos:', error);
+      res.status(500).json({
+        error: 'Error interno del servidor',
+        message: error.message || 'Error procesando la solicitud'
+      });
+    }
+  }
 }
 
 export default new ChatController(); 

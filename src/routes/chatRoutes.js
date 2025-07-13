@@ -6,5 +6,6 @@ const router = express.Router();
 router.post('/analyze', chatController.analyzeSymptoms);
 router.get('/test', chatController.testConnection);
 router.get('/info', chatController.getServiceInfo);
+router.post('/filter-centers', chatController.filterMedicalCenters);
 
 export default router; 
