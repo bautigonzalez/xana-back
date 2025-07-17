@@ -1,5 +1,6 @@
 import express from 'express';
 import chatRoutes from './chatRoutes.js';
+import authRoutes from './authRoutes.js';
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ router.get('/', (req, res) => {
 });
 
 router.use('/chat', chatRoutes);
+router.use('/auth', authRoutes);
 
 router.get('/pharmacies', (req, res) => {
   res.json({
@@ -34,6 +36,18 @@ router.get('/centers', (req, res) => {
   res.json({
     message: 'Centros médicos endpoint - Coming soon!',
     data: []
+  });
+});
+
+router.get('/auth', (req, res) => {
+  res.json({
+    message: 'Auth endpoints - Coming soon!',
+    endpoints: {
+      login: 'POST /auth/login',
+      register: 'POST /auth/register',
+      profile: 'GET /auth/profile',
+      logout: 'POST /auth/logout'
+    }
   });
 });
 
