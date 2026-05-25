@@ -14,18 +14,31 @@ router.post('/register', register);
 router.post('/login', login);
 
 // Google OAuth2
-router.get('/google', passport.authenticate('google', {
-  scope: ['profile', 'email'],
-  session: false
-}));
+router.get('/google', (req, res, next) => {
+  const { state } = req.query;
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    session: false,
+    state: state // Pass the state (which contains redirect_uri)
+  })(req, res, next);
+});
 
 // Google OAuth2 callback
-router.get('/google/callback', passport.authenticate('google', { session: false, failureRedirect: '/' }), (req, res) => {
-  // Generar JWT y redirigir al frontend con el token
-  const token = generateToken(req.user);
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  // Puedes enviar el token como query param o en localStorage usando window.opener
-  res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+router.get('/google/callback', (req, res, next) => {
+  const state = req.query.state ? JSON.parse(Buffer.from(req.query.state, 'base64').toString()) : {};
+  passport.authenticate('google', { session: false, failureRedirect: '/' })(req, res, () => {
+    // Generar JWT y redirigir
+    const token = generateToken(req.user);
+
+    // Si viene un redirect_uri en el state, usarlo (para mobile)
+    if (state.redirect_uri) {
+      const separator = state.redirect_uri.includes('?') ? '&' : '?';
+      return res.redirect(`${state.redirect_uri}${separator}token=${token}`);
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+  });
 });
 
 // Middleware para verificar JWT
