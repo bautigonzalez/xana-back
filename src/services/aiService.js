@@ -50,7 +50,7 @@ class AIService {
 
       const prompt = this.buildMedicalPrompt(symptoms, userLocation, conversationHistory);
       
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiApiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -63,7 +63,7 @@ class AIService {
           }],
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: 400,
+            maxOutputTokens: 2048,
             topP: 0.8,
             topK: 40
           }
@@ -211,7 +211,7 @@ Responde únicamente con el JSON.`;
       return false;
     }
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiApiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -224,7 +224,7 @@ Responde únicamente con el JSON.`;
           }],
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: 10,
+            maxOutputTokens: 1000,
             topP: 0.8,
             topK: 40
           }
@@ -331,14 +331,14 @@ ${JSON.stringify(names, null, 2)}
   // Llamada genérica a Gemini (para prompts custom)
   async callGemini(prompt) {
     if (!this.geminiApiKey) throw new Error('No hay API key de Gemini configurada');
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiApiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.3,
-          maxOutputTokens: 500,
+          maxOutputTokens: 2048,
           topP: 0.8,
           topK: 40
         }
