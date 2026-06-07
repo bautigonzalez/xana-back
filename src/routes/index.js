@@ -1,6 +1,7 @@
 import express from 'express';
 import chatRoutes from './chatRoutes.js';
 import authRoutes from './authRoutes.js';
+import favoriteRoutes from './favoriteRoutes.js';
 
 const router = express.Router();
 
@@ -14,6 +15,11 @@ router.get('/', (req, res) => {
         test: 'GET /chat/test',
         info: 'GET /chat/info'
       },
+      favorites: {
+        list: 'GET /favorites',
+        add: 'POST /favorites',
+        remove: 'DELETE /favorites/:place_id'
+      },
       pharmacies: '/pharmacies',
       centers: '/centers',
       health: '/health'
@@ -24,6 +30,7 @@ router.get('/', (req, res) => {
 
 router.use('/chat', chatRoutes);
 router.use('/auth', authRoutes);
+router.use('/favorites', favoriteRoutes);
 
 router.get('/pharmacies', (req, res) => {
   res.json({

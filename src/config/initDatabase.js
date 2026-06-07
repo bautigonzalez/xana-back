@@ -52,9 +52,28 @@ export const initDatabase = async () => {
         address TEXT,
         latitude DECIMAL(10, 8),
         longitude DECIMAL(11, 8),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        rating DECIMAL(3, 2) DEFAULT 0,
+        open_now BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT unique_user_place UNIQUE (user_id, place_id)
       )
     `);
+
+    // Migración/Alteración segura para base de datos ya existente
+    await pool.query(`
+      ALTER TABLE user_favorites ADD COLUMN IF NOT EXISTS rating DECIMAL(3, 2) DEFAULT 0;
+      ALTER TABLE user_favorites ADD COLUMN IF NOT EXISTS open_now BOOLEAN DEFAULT false;
+    `);
+
+    await pool.query(`
+      ALTER TABLE user_favorites ADD CONSTRAINT unique_user_place UNIQUE (user_id, place_id);
+    `).catch(err => {
+      // Ignorar error si el constraint ya existe (error 42710 en postgres)
+      if (err.code !== '42710') {
+        console.error('Error adding unique constraint to user_favorites:', err);
+      }
+    });
+
 
     // Tabla de CHATS (Historial de conversaciones)
     await pool.query(`
