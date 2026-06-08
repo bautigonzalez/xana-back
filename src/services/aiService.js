@@ -19,7 +19,7 @@ class AIService {
   }
 
   // Analizar síntomas y generar recomendaciones
-  async analyzeSymptoms(symptoms, userLocation = null, conversationHistory = []) {
+  async analyzeSymptoms(symptoms, userLocation = null, conversationHistory = [], image = null) {
     // Validación de ruido o mensaje sin sentido
     const isGibberish = (text) => {
       const clean = text.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -48,8 +48,18 @@ class AIService {
         throw new Error('No hay API key de Gemini configurada');
       }
 
-      const prompt = this.buildMedicalPrompt(symptoms, userLocation, conversationHistory);
+      const prompt = this.buildMedicalPrompt(symptoms, userLocation, conversationHistory, image);
       
+      const parts = [{ text: prompt }];
+      if (image && image.data) {
+        parts.push({
+          inlineData: {
+            mimeType: image.mimeType || 'image/jpeg',
+            data: image.data
+          }
+        });
+      }
+
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`, {
         method: 'POST',
         headers: {
@@ -57,9 +67,7 @@ class AIService {
         },
         body: JSON.stringify({
           contents: [{
-            parts: [{
-              text: prompt
-            }]
+            parts: parts
           }],
           generationConfig: {
             temperature: 0.3,
@@ -97,8 +105,8 @@ class AIService {
     }
   }
 
-  buildMedicalPrompt(symptoms, userLocation, conversationHistory) {
-    let prompt = `Eres un asistente médico virtual experto. Analiza los síntomas y devuelve una respuesta en formato JSON estructurado.
+  buildMedicalPrompt(symptoms, userLocation, conversationHistory, image = null) {
+    let prompt = `Eres un asistente médico virtual experto. Analiza los síntomas ${image ? 'y la imagen adjunta de forma visual ' : ''}y devuelve una respuesta en formato JSON estructurado.
 
 IMPORTANTE:
 - Si el usuario solo saluda (por ejemplo: "hola", "buenos días", "hola cómo estás", etc.), responde SOLO con el mensaje de bienvenida de Xana, cálido y profesional, con las viñetas de funcionalidades. NO incluyas urgencia, recomendaciones ni especialidades. Ejemplo:

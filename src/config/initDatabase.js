@@ -97,6 +97,11 @@ export const initDatabase = async () => {
       )
     `);
 
+    // Migración/Alteración segura para agregar columna image_data
+    await pool.query(`
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_data TEXT;
+    `);
+
     console.log('Database initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
