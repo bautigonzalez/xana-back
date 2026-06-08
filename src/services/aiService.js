@@ -120,6 +120,11 @@ IMPORTANTE:
   "accion": "mostrar_farmacias"
 }
 
+- Si el usuario responde con mensajes cortos de cortesía, confirmación o agradecimiento (por ejemplo: "ok", "gracias", "entendido", "perfecto", "listo", "bueno", "de acuerdo", etc.), responde con un JSON que tenga "urgencia": "BAJO", sin recomendaciones ni especialidades, y con un "mensaje_principal" breve y natural de cortesía (por ejemplo: "¡De nada! Cuídate mucho.", "Perfecto, quedo a tu disposición si necesitas algo más."). Ejemplo:
+{
+  "mensaje_principal": "¡De nada! Si tienes alguna otra duda en el futuro, estaré aquí para ayudarte. ¡Cuídate!"
+}
+
 ${conversationHistory.length > 0 ? `HISTORIAL DE CONVERSACIÓN:
 ${conversationHistory.map(msg => `${msg.role === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`).join('\n')}
 
@@ -152,6 +157,7 @@ DEBES RESPONDER ÚNICAMENTE CON UN JSON EN ESTE FORMATO EXACTO:
 IMPORTANTE:
 - Si el usuario solo saluda, responde como se indicó arriba y NO incluyas urgencia, explicaciones, recomendaciones ni especialidades.
 - Si el usuario pregunta por farmacias, responde como se indicó arriba (mensaje directo + acceso) y NO incluyas urgencia, explicaciones, recomendaciones ni especialidades.
+- Si el usuario envía mensajes cortos de cortesía, agradecimiento o confirmación, responde como se indicó arriba (mensaje breve de cortesía) y NO incluyas urgencia, explicaciones, recomendaciones ni especialidades.
 - Si la imagen adjunta no muestra ninguna lesión, síntoma o anomalía visible (la imagen se ve saludable o normal) y el usuario no describe molestias significativas, debes establecer la urgencia en "BAJO" y explicar en el mensaje principal que todo luce normal y no se aprecian signos de preocupación. Evita a toda costa alucinar o inventar problemas (como ojos rojos, sarpullidos o inflamación) si la imagen es normal.
 - Responde SOLO con el JSON, sin texto adicional
 - El mensaje_principal debe ser profesional y claro
