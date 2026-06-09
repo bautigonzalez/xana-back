@@ -183,7 +183,7 @@ Responde únicamente con el JSON.`;
       const jsonData = JSON.parse(jsonMatch[0]);
       const formattedContent = this.formatJSONToHTML(jsonData);
       return {
-        urgencia: jsonData.urgencia?.toLowerCase() || 'bajo',
+        urgencia: jsonData.urgencia ? jsonData.urgencia.toLowerCase() : undefined,
         especialidades: jsonData.especialidades || ['Medicina General'],
         recomendaciones: jsonData.recomendaciones || ['Consulta con un profesional de la salud'],
         formattedContent: formattedContent,
