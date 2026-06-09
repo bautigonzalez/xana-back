@@ -233,6 +233,27 @@ class ChatController {
       res.status(500).json({ error: 'Error al obtener mensajes' });
     }
   }
+
+  async deleteChat(req, res) {
+    try {
+      const user = req.user;
+      const { id } = req.params;
+      if (!user) return res.status(401).json({ error: 'No autorizado' });
+
+      const { pool } = await import('../config/database.js');
+
+      // Verificar pertenencia y eliminar (las llaves foráneas tienen ON DELETE CASCADE, por lo que borrará los mensajes asociados)
+      const result = await pool.query('DELETE FROM chats WHERE id = $1 AND user_id = $2 RETURNING id', [id, user.id]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Chat no encontrado o no pertenece al usuario' });
+      }
+
+      res.json({ success: true, message: 'Consulta eliminada con éxito' });
+    } catch (error) {
+      console.error('❌ Error eliminando chat:', error);
+      res.status(500).json({ error: 'Error al eliminar la consulta' });
+    }
+  }
 }
 
 export default new ChatController(); 

@@ -13,5 +13,6 @@ router.post('/recommend-centers', chatController.recommendMedicalCenters);
 // Rutas de historial
 router.get('/history', requireAuth, chatController.getHistory);
 router.get('/history/:id', requireAuth, chatController.getChatMessages);
+router.delete('/history/:id', requireAuth, chatController.deleteChat);
 
 export default router; 
