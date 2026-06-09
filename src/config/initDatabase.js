@@ -66,6 +66,11 @@ export const initDatabase = async () => {
     `);
 
     await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code VARCHAR(6);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code_expires_at TIMESTAMP;
+    `);
+
+    await pool.query(`
       ALTER TABLE user_favorites ADD CONSTRAINT unique_user_place UNIQUE (user_id, place_id);
     `).catch(err => {
       // Ignorar error si el constraint ya existe (error 42710 en postgres)

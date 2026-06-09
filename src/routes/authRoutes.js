@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, me } from '../controllers/authController.js';
+import { register, login, me, forgotPassword, resetPassword, deleteUserData } from '../controllers/authController.js';
 import { passport, generateToken } from '../config/passport.js';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
@@ -100,5 +100,12 @@ router.get('/verify', requireAuth, (req, res) => {
 router.post('/logout', (req, res) => {
   res.json({ success: true, message: 'Sesión cerrada' });
 });
+
+// Recuperar contraseña
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+
+// Eliminar datos personales (chats y favoritos)
+router.delete('/delete-data', requireAuth, deleteUserData);
 
 export default router; 
