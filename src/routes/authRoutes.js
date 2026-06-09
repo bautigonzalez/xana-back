@@ -33,7 +33,38 @@ router.get('/google/callback', (req, res, next) => {
     // Si viene un redirect_uri en el state, usarlo (para mobile)
     if (state.redirect_uri) {
       const separator = state.redirect_uri.includes('?') ? '&' : '?';
-      return res.redirect(`${state.redirect_uri}${separator}token=${token}`);
+      const targetUrl = `${state.redirect_uri}${separator}token=${token}`;
+
+      if (!state.redirect_uri.startsWith('http')) {
+        return res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Redirigiendo a Xana...</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; text-align: center; padding: 50px 20px; background-color: #F8FAFC; color: #334155; }
+              .card { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+              .btn { display: inline-block; padding: 14px 28px; background-color: #1CC7B6; color: white; text-decoration: none; border-radius: 12px; font-weight: bold; margin-top: 20px; font-size: 16px; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h2>¡Inicio de sesión exitoso!</h2>
+              <p>Presiona el botón de abajo para volver a la aplicación Xana si no eres redirigido automáticamente:</p>
+              <a class="btn" href="${targetUrl}">Volver a Xana</a>
+            </div>
+            <script>
+              window.location.href = "${targetUrl}";
+              setTimeout(function() {
+                window.location.href = "${targetUrl}";
+              }, 500);
+            </script>
+          </body>
+          </html>
+        `);
+      }
+      return res.redirect(targetUrl);
     }
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
