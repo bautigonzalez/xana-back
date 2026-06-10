@@ -23,7 +23,10 @@ async function getTransporter() {
   } else {
     console.log('📨 Creando cuenta de Ethereal Email de prueba (desarrollo)...');
     try {
-      const testAccount = await nodemailer.createTestAccount();
+      const testAccount = await Promise.race([
+        nodemailer.createTestAccount(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout creating Ethereal account')), 5000))
+      ]);
       transporterInstance = nodemailer.createTransport({
         host: 'smtp.ethereal.email',
         port: 587,
@@ -35,7 +38,7 @@ async function getTransporter() {
       });
       console.log('✅ Cuenta Ethereal creada. User:', testAccount.user);
     } catch (err) {
-      console.error('⚠️ Error creando cuenta Ethereal, usando fallback de consola:', err);
+      console.error('⚠️ Error creando cuenta Ethereal, usando fallback de consola:', err.message);
       transporterInstance = {
         sendMail: async (mailOptions) => {
           console.log('\n=======================================');
