@@ -4,6 +4,41 @@ dotenv.config();
 
 let transporterInstance = null;
 
+// Enviar usando la API HTTP de Resend (evita bloqueo de puertos SMTP en Railway)
+async function sendViaResendApi(apiKey, { to, subject, text, html }) {
+  console.log('📨 Enviando email usando la API HTTP de Resend (Bypassing SMTP)...');
+  // Resend requiere enviar desde un dominio verificado. De lo contrario, usar onboarding@resend.dev
+  const fromEmail = process.env.SMTP_FROM || 'onboarding@resend.dev';
+  
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        text,
+        html
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || JSON.stringify(data));
+    }
+
+    console.log(`✉️ Email enviado con éxito vía Resend API a ${to}. ID: ${data.id}`);
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error('❌ Error enviando email con Resend API:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 async function getTransporter() {
   if (transporterInstance) return transporterInstance;
 
@@ -57,6 +92,12 @@ async function getTransporter() {
 }
 
 export async function sendEmail({ to, subject, text, html }) {
+  const resendApiKey = process.env.RESEND_API_KEY || (process.env.SMTP_PASS?.startsWith('re_') ? process.env.SMTP_PASS : null);
+
+  if (resendApiKey) {
+    return sendViaResendApi(resendApiKey, { to, subject, text, html });
+  }
+
   try {
     const transporter = await getTransporter();
     const fromEmail = process.env.SMTP_FROM || '"Soporte Xana" <no-reply@xana.app>';

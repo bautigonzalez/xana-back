@@ -116,7 +116,10 @@ export async function forgotPassword(req, res) {
       `
     };
 
-    await sendEmail(mailContent);
+    const emailRes = await sendEmail(mailContent);
+    if (!emailRes.success) {
+      return res.status(500).json({ error: `No se pudo enviar el correo de recuperación: ${emailRes.error}` });
+    }
 
     res.json({ success: true, message: 'Si el correo existe, se enviará un código de verificación' });
   } catch (err) {
