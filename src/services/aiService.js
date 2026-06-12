@@ -23,13 +23,34 @@ class AIService {
     // Validación de ruido o mensaje sin sentido
     const isGibberish = (text) => {
       const clean = text.trim().toLowerCase().replace(/\s+/g, ' ');
-      if (clean.length <= 20) return false;
-      const whitelist = ['hola', 'hola xana', 'buenas', 'buenos días', 'buenas tardes', 'buenas noches', 'saludos', 'hey'];
+      if (clean.length < 4) return false;
+      const whitelist = ['hola', 'hola xana', 'buenas', 'buenos días', 'buenas tardes', 'buenas noches', 'saludos', 'hey', 'ok', 'gracias'];
       if (whitelist.some(w => clean === w)) return false;
-      if (clean.length > 30 && !clean.includes(' ')) return true;
+      if (!clean.includes(' ')) {
+        if (clean.length > 15) {
+          const vowelCount = (clean.match(/[aeiouáéíóúü]/g) || []).length;
+          if (vowelCount / clean.length < 0.20) return true;
+        }
+      }
       const words = clean.split(/\s+/);
-      const longNoVowel = words.filter(w => w.length >= 8 && !/[aeiouáéíóú]/.test(w));
-      if (words.length > 2 && longNoVowel.length / words.length > 0.7) return true;
+      const hasExtremelyLongGibberishWord = words.some(w => {
+        if (w.length > 12) {
+          const vowels = (w.match(/[aeiouáéíóúü]/g) || []).length;
+          if (vowels / w.length < 0.22) return true;
+          if (/[bcdfghjklmnñpqrstvwxyz]{5,}/.test(w)) return true;
+        }
+        return false;
+      });
+      if (hasExtremelyLongGibberishWord) return true;
+      const letters = clean.replace(/[^a-zñáéíóúü]/g, '');
+      if (letters.length > 8) {
+        const vowels = (letters.match(/[aeiouáéíóúü]/g) || []).length;
+        if (vowels / letters.length < 0.20 || vowels / letters.length > 0.85) return true;
+      }
+      if (clean.length > 10) {
+        const patternMatch = /(.)\1{4,}/.test(clean);
+        if (patternMatch) return true;
+      }
       return false;
     };
 
@@ -96,7 +117,8 @@ class AIService {
         specialties: parsedResponse.especialidades,
         urgency: parsedResponse.urgencia,
         recommendations: parsedResponse.recomendaciones,
-        accion: parsedResponse.accion
+        accion: parsedResponse.accion,
+        busqueda_ubicacion: parsedResponse.busqueda_ubicacion
       };
 
     } catch (error) {
@@ -120,9 +142,25 @@ IMPORTANTE:
   "accion": "mostrar_farmacias"
 }
 
-- Si el usuario responde con mensajes cortos de cortesía, confirmación o agradecimiento (por ejemplo: "ok", "gracias", "entendido", "perfecto", "listo", "bueno", "de acuerdo", etc.), responde con un JSON que tenga "urgencia": "BAJO", sin recomendaciones ni especialidades, y con un "mensaje_principal" breve y natural de cortesía (por ejemplo: "¡De nada! Cuídate mucho.", "Perfecto, quedo a tu disposición si necesitas algo más."). Ejemplo:
+- Si el usuario responde con mensajes cortos de agradecimiento (por ejemplo: "gracias", "muchas gracias", "de acuerdo gracias", etc.), responde con un JSON breve de cortesía y agradecimiento. Ejemplo:
 {
   "mensaje_principal": "¡De nada! Si tienes alguna otra duda en el futuro, estaré aquí para ayudarte. ¡Cuídate!"
+}
+
+- Si el usuario responde con mensajes cortos de confirmación o de cortesía (por ejemplo: "ok", "entendido", "perfecto", "listo", "de acuerdo", "bueno", etc.), responde con un JSON breve confirmando la recepción del mensaje sin decir "de nada". Ejemplo:
+{
+  "mensaje_principal": "Perfecto. Si notas algún cambio o tienes alguna duda, avísame. ¡Cuídate!"
+}
+
+- Si el usuario pregunta por clínicas cercanas, hospitales, centros de salud o frases similares (por ejemplo: "a qué clínica puedo ir", "dónde hay un hospital", "clínicas cerca", etc.), responde SOLO con un mensaje amigable indicando que puede ver los centros médicos cercanos y el campo especial: "accion": "mostrar_centros_medicos". NO incluyas el saludo ni las viñetas, ni urgencia, recomendaciones ni especialidades. Ejemplo:
+{
+  "mensaje_principal": "¡Por supuesto! Aquí tienes un acceso directo para ver centros médicos cercanos a tu ubicación.",
+  "accion": "mostrar_centros_medicos"
+}
+
+- Si el usuario realiza una consulta completamente fuera de tema, irrelevante para la salud o medicina (por ejemplo, preguntas sobre deportes, recetas de cocina, desarrollo de software o código de programación, tareas de matemáticas, historia, entretenimiento, etc.): responde SOLO con un mensaje profesional, empático y directo indicando que eres Xana, un asistente médico virtual, y que solo puedes responder dudas relacionadas con salud, síntomas, farmacias o centros médicos. NO incluyas urgencia, explicaciones, recomendaciones ni especialidades en el JSON. Ejemplo:
+{
+  "mensaje_principal": "Entiendo tu interés, pero como tu asistente médico virtual, mi función principal es orientarte en temas de salud, síntomas, o ayudarte a encontrar farmacias y centros médicos. No puedo ayudarte con consultas de otros temas. ¿Hay algo relacionado con tu bienestar en lo que pueda asistirte?"
 }
 
 ${conversationHistory.length > 0 ? `HISTORIAL DE CONVERSACIÓN:
@@ -151,13 +189,22 @@ DEBES RESPONDER ÚNICAMENTE CON UN JSON EN ESTE FORMATO EXACTO:
   "especialidades": [
     "Especialidad 1",
     "Especialidad 2"
-  ]
+  ],
+  "accion": "mostrar_farmacias|mostrar_centros_medicos", // Opcional si corresponde
+  "busqueda_ubicacion": "Nombre de la ubicación mencionada por el usuario" // Opcional, SOLO si el usuario especifica un lugar/barrio/ciudad en su consulta
 }
 
 IMPORTANTE:
 - Si el usuario solo saluda, responde como se indicó arriba y NO incluyas urgencia, explicaciones, recomendaciones ni especialidades.
 - Si el usuario pregunta por farmacias, responde como se indicó arriba (mensaje directo + acceso) y NO incluyas urgencia, explicaciones, recomendaciones ni especialidades.
-- Si el usuario envía mensajes cortos de cortesía, agradecimiento o confirmación, responde como se indicó arriba (mensaje breve de cortesía) y NO incluyas urgencia, explicaciones, recomendaciones ni especialidades.
+- Si el usuario pregunta por clínicas, responde como se indicó arriba (mensaje directo + acceso) y NO incluyas urgencia, explicaciones, recomendaciones ni especialidades.
+- Si el usuario realiza una consulta fuera de tema (off-topic), responde como se indicó arriba (mensaje directo indicando tu propósito) y NO incluyas urgencia, explicaciones, recomendaciones ni especialidades.
+- Si el usuario envía mensajes cortos de cortesía, agradecimiento o confirmación, responde como se indicó arriba (mensaje breve de cortesía o confirmación) y NO incluyas urgencia, explicaciones, recomendaciones ni especialidades.
+- Si la consulta es un seguimiento o continuación de la conversación (ej: el usuario pregunta "¿qué hago?", "¿puedo tomar algo?", "¿a dónde voy?", etc.) sobre síntomas ya descritos:
+  * Responde de forma puramente conversacional en "mensaje_principal", respondiendo su duda directamente.
+  * NO incluyas "explicacion_urgencia" ni "especialidades" en el JSON, para evitar repetir advertencias redundantes que ya se dieron en el historial.
+  * Mantén el nivel "urgencia" igual que en el mensaje anterior.
+  * IMPORTANTE: Si el usuario introduce NUEVOS SÍNTOMAS o reporta que empeoraron de forma importante, entonces SÍ reanaliza la gravedad, actualiza el nivel de "urgencia" y vuelve a incluir la explicación y las especialidades necesarias.
 - Si la imagen adjunta no muestra ninguna lesión, síntoma o anomalía visible (la imagen se ve saludable o normal) y el usuario no describe molestias significativas, debes establecer la urgencia en "BAJO" y explicar en el mensaje principal que todo luce normal y no se aprecian signos de preocupación. Evita a toda costa alucinar o inventar problemas (como ojos rojos, sarpullidos o inflamación) si la imagen es normal.
 - Responde SOLO con el JSON, sin texto adicional
 - El mensaje_principal debe ser profesional y claro
@@ -166,6 +213,7 @@ IMPORTANTE:
 - Mantén el contexto de la conversación anterior
 - No diagnostiques enfermedades específicas
 - Siempre recomienda consultar con un profesional
+- Si el usuario especifica un lugar en el texto (ej: "Morón", "Palermo"), extrae ese nombre de lugar en "busqueda_ubicacion". No inventes lugares si el usuario no los nombra explícitamente.
 - NO incluyas información adicional fuera del JSON
  
 Responde únicamente con el JSON.`;
@@ -184,10 +232,11 @@ Responde únicamente con el JSON.`;
       const formattedContent = this.formatJSONToHTML(jsonData);
       return {
         urgencia: jsonData.urgencia ? jsonData.urgencia.toLowerCase() : undefined,
-        especialidades: jsonData.especialidades || ['Medicina General'],
-        recomendaciones: jsonData.recomendaciones || ['Consulta con un profesional de la salud'],
+        especialidades: jsonData.especialidades || [],
+        recomendaciones: jsonData.recomendaciones || [],
         formattedContent: formattedContent,
-        accion: jsonData.accion || undefined
+        accion: jsonData.accion || undefined,
+        busqueda_ubicacion: jsonData.busqueda_ubicacion || undefined
       };
     } catch (error) {
       console.error('Error parseando JSON de Gemini:', error);
