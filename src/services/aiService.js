@@ -6,6 +6,7 @@ dotenv.config();
 class AIService {
   constructor() {
     this.geminiApiKey = process.env.GEMINI_API_KEY;
+    this.googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
     this.initGemini();
   }
 
@@ -15,6 +16,23 @@ class AIService {
       console.log('✅ Gemini API key configurada');
     } else {
       console.log('⚠️ No hay API key de Gemini configurada');
+    }
+  }
+
+  // Obtener dirección a partir de coordenadas
+  async reverseGeocode(lat, lng) {
+    if (!this.googleMapsApiKey) return null;
+    try {
+      const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${this.googleMapsApiKey}&language=es`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (data.status === 'OK' && data.results && data.results[0]) {
+        return data.results[0].formatted_address;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error en reverseGeocode:', error);
+      return null;
     }
   }
 
@@ -69,7 +87,12 @@ class AIService {
         throw new Error('No hay API key de Gemini configurada');
       }
 
-      const prompt = this.buildMedicalPrompt(symptoms, userLocation, conversationHistory, image);
+      let userAddress = null;
+      if (userLocation && userLocation.lat && userLocation.lng) {
+        userAddress = await this.reverseGeocode(userLocation.lat, userLocation.lng);
+      }
+
+      const prompt = this.buildMedicalPrompt(symptoms, userLocation, conversationHistory, image, userAddress);
       
       const parts = [{ text: prompt }];
       if (image && image.data) {
@@ -127,7 +150,7 @@ class AIService {
     }
   }
 
-  buildMedicalPrompt(symptoms, userLocation, conversationHistory, image = null) {
+  buildMedicalPrompt(symptoms, userLocation, conversationHistory, image = null, userAddress = null) {
     let prompt = `Eres un asistente médico virtual experto. Analiza los síntomas ${image ? 'y la imagen adjunta de forma visual ' : ''}y devuelve una respuesta en formato JSON estructurado.
 
 IMPORTANTE:
@@ -168,7 +191,8 @@ ${conversationHistory.map(msg => `${msg.role === 'user' ? 'Usuario' : 'Asistente
 
 ` : ''}SÍNTOMAS ACTUALES: "${symptoms}"
 
-${userLocation ? `UBICACIÓN: ${userLocation.lat}, ${userLocation.lng}` : ''}
+${userLocation ? `UBICACIÓN COORDENADAS: ${userLocation.lat}, ${userLocation.lng}` : ''}
+${userAddress ? `UBICACIÓN APROXIMADA DIRECCIÓN POSTAL (REFERENCIA DE PAÍS/PROVINCIA/CIUDAD): "${userAddress}"` : ''}
 
 EVALÚA LA URGENCIA:
 - ALTO: Dolor intenso, sangrado abundante, dificultad para respirar, pérdida de consciencia, traumatismos graves, fracturas
@@ -190,8 +214,8 @@ DEBES RESPONDER ÚNICAMENTE CON UN JSON EN ESTE FORMATO EXACTO:
     "Especialidad 1",
     "Especialidad 2"
   ],
-  "accion": "mostrar_farmacias|mostrar_centros_medicos", // Opcional si corresponde
-  "busqueda_ubicacion": "Nombre de la ubicación mencionada por el usuario" // Opcional, SOLO si el usuario especifica un lugar/barrio/ciudad en su consulta
+  "accion": "mostrar_farmacias|mostrar_centros_medicos",
+  "busqueda_ubicacion": "Nombre de la ubicación mencionada por el usuario"
 }
 
 IMPORTANTE:
@@ -213,11 +237,15 @@ IMPORTANTE:
 - Mantén el contexto de la conversación anterior
 - No diagnostiques enfermedades específicas
 - Siempre recomienda consultar con un profesional
-- Si el usuario especifica un lugar en el texto (ej: "Morón", "Palermo"), extrae ese nombre de lugar en "busqueda_ubicacion". No inventes lugares si el usuario no los nombra explícitamente.
+- Interpretación inteligente y validación de ubicación:
+  * El usuario puede referirse a lugares de forma incompleta, coloquial, abreviada o puramente local (por ejemplo, "Leloir" por "Parque Leloir", o nombres de calles/barrios).
+  * Si el usuario menciona un lugar, asume de forma inteligente y prioriza las localidades o zonas que pertenezcan o estén más cerca de la "UBICACIÓN APROXIMADA DIRECCIÓN POSTAL" provista arriba (ej. si el usuario está en Buenos Aires y escribe "Leloir", se refiere a Parque Leloir, Ituzaingó, Buenos Aires).
+  * Si el lugar mencionado es válido y logras identificar a qué localidad/provincia/país se refiere (usando la cercanía), devuelve en "busqueda_ubicacion" el nombre completo normalizado e interpretado del lugar (ej: "Parque Leloir, Ituzaingó, Buenos Aires, Argentina") para que el geocodificador lo resuelva correctamente.
+  * Si el lugar mencionado no existe, es completamente irreconocible o no coincide con nada real, o si consideras que es tan ambiguo que existen múltiples lugares idénticos en distintas provincias y no sabes cuál elegir: en el "mensaje_principal" indícaselo de forma amigable (por ejemplo: "No encontré el lugar 'X'. ¿Podrías indicarme la localidad o provincia para buscarlo?", o "¿Te refieres a Parque Leloir en Ituzaingó o a otra ubicación?"). En ese caso, NO devuelvas el campo "accion" ni "busqueda_ubicacion" en el JSON, ya que no son válidos para búsqueda de mapas.
 - NO incluyas información adicional fuera del JSON
  
 Responde únicamente con el JSON.`;
- 
+
     return prompt;
   }
 
